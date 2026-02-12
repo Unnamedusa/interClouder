@@ -1,4 +1,4 @@
-/* ═══ interClouder v4.5 — Core Data ═══ */
+/* ═══ interClouder v4.6 — Core Data ═══ */
 window.CNI={clamp:(v,a,b)=>Math.max(0,Math.min(1,(v-a)/(b-a||1)))};
 
 // Roles — perks are OWN only; use RP() for inherited
@@ -21,6 +21,7 @@ window.RP=role=>{
 window.B={
   founder:{l:"Founder",i:"⬡",c:"#FFD700",t:"special",img:null},
   early:{l:"Early Supporter",i:"🌅",c:"#F59E0B",t:"special",img:null},
+  early_owner:{l:"Early Server Owner",i:"🏰",c:"#14B8A6",t:"special",img:null},
   dev:{l:"Developer",i:"</>",c:"#06D6A0",t:"special",img:null},
   bug:{l:"Bug Hunter",i:"🐛",c:"#EF4444",t:"special",img:null},
   nitro:{l:"Airbound",i:"✨",c:"#C084FC",t:"premium",img:null},
@@ -42,7 +43,15 @@ window.P={
 };
 
 window.EARLY={count:0,max:10000,check(t){if(t!=="air"&&this.count<this.max){this.count++;return true}return false}};
+// Early Server: first 15K servers created get "Early Owner" tag for their owner
+window.ESRV={max:15000,get count(){return parseInt(localStorage.getItem("ic_esrv_count")||"0")},inc(){const c=this.count+1;localStorage.setItem("ic_esrv_count",""+c);return c<=this.max},isEarly(){return this.count<=this.max}};
 window.STR=[{n:1,a:"Warning"},{n:2,a:"Mute 10m",d:600},{n:3,a:"Mute 1h",d:3600},{n:4,a:"Mute 24h",d:86400},{n:5,a:"Mute 7d",d:604800},{n:6,a:"Kick"},{n:7,a:"Ban 30d",d:2592000},{n:8,a:"Permaban"}];
+// Reputation system
+window.REP={
+  levels:[{min:-999,n:"Blacklisted",c:"#000",i:"⛔"},{min:0,n:"Untrusted",c:"#EF4444",i:"🔻"},{min:20,n:"Neutral",c:"#6B7280",i:"○"},{min:50,n:"Trusted",c:"#06D6A0",i:"✓"},{min:100,n:"Respected",c:"#818CF8",i:"⭐"},{min:250,n:"Honored",c:"#FBBF24",i:"🏅"},{min:500,n:"Legendary",c:"#FFD700",i:"👑"},{min:1000,n:"Mythic",c:"#FF6B6B",i:"🔱"}],
+  calc(u){let s=0;s+=Math.min((u.xp||0)/10,100);s+=Math.min(Math.floor((Date.now()-(u.created||Date.now()))/864e5),60);s-=(u.strikes||0)*15;s-=(u.reports||0)*5;s+=Math.min((u.msgs||0)/5,80);s+=(u.badges||[]).length*3;if(u.premium)s+=20;return Math.round(s)},
+  level(score){let l=this.levels[0];for(const lv of this.levels)if(score>=lv.min)l=lv;return l},
+};
 window.SM=[0,5,10,15,30,60,120,300,600,1800,3600];
 window.smL=v=>v===0?"Off":v<60?v+"s":v<3600?Math.floor(v/60)+"m":Math.floor(v/3600)+"h";
 window.ENC=["HoneyTrap","Fractal-Quantum","Neo-Enigma","Reverse-Matrix","Jaw-Breaker"];
@@ -95,4 +104,4 @@ window.DSET={
   gradient:null, // {c1,c2} or null
 };
 
-window.UPDATES=[{id:"v45",ver:"v4.5",title:"interClouder v4.5 — Complete Overhaul",big:true,changes:["Full payment system for Airbound tiers","CEO panel with XP/badge/rank management","Test account creator (CEO only)","Custom gradient profiles","Animated profiles & banners","Persistent settings & switches","Role perk inheritance","Early Supporter (first 10K Elite+ buyers)"]}];
+window.UPDATES=[{id:"v46",ver:"v4.6",title:"interClouder v4.6 — Early Servers & Reputation",big:true,changes:["Early Server system — first 15K servers get special owner tag","Reputation engine — XP, age, strikes, messages factored","Fancy visual Admin Panel with dashboard & user cards","Reputation levels: Untrusted → Neutral → Trusted → Honored → Legendary → Mythic","CEO/Admin can grant Early Owner tag manually after cap","All previous v4.6 features intact"]}];

@@ -1,4 +1,4 @@
-/* ═══ interClouder v4.5 — Components ═══ */
+/* ═══ interClouder v4.6 — Components ═══ */
 const {useState,useEffect,useRef,useCallback}=React;
 
 // ── Atoms ──

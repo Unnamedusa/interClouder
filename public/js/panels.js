@@ -1,4 +1,4 @@
-/* ═══ interClouder v4.5 — Panels ═══ */
+/* ═══ interClouder v4.6 — Panels ═══ */
 
 // ── Chat ──
 const Chat=({ch,msgs,onSend,onReact,user,notify})=>{
@@ -115,6 +115,13 @@ const ProfileModal=({user,onClose,notify,isOwner,onEditUser})=>{
           </div>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6,marginTop:8}}><span style={{fontSize:9,color:"var(--txg)"}}>XP</span><XPBar xp={user?.xp||0} w={120}/><span style={{fontSize:9,color:"var(--txm)",fontFamily:"monospace"}}>{user?.xp||0}</span></div>
+        {/* Reputation */}
+        {(()=>{const rep=REP.calc(user||{});const rl=REP.level(rep);return<div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
+          <span style={{fontSize:9,color:"var(--txg)"}}>Rep</span>
+          <div style={{width:120,height:4,borderRadius:2,background:"var(--bdr)",overflow:"hidden"}}><div style={{width:`${Math.min(Math.max(rep,0)/500*100,100)}%`,height:"100%",borderRadius:2,background:rl.c}}/></div>
+          <span className="chip" style={{background:`${rl.c}18`,color:rl.c,fontSize:8}}>{rl.i} {rl.n}</span>
+          <span style={{fontSize:9,color:rl.c,fontFamily:"monospace"}}>{rep}</span>
+        </div>})()}
         <button className="btn bp" onClick={onClose} style={{width:"100%",marginTop:10}}>Close</button>
       </div>
     </div></div>
@@ -182,16 +189,21 @@ const ModPanel=({srvs,aS,notify,onEditSrv,onDeleteSrv})=>{
   );
 };
 
-// ── CEO Panel ──
-const CEOPanel=({notify,user,allUsers,onEditUser,onCreateTest,onDeleteUser,onAnnounce})=>{
-  const [tab,setTab]=useState("cmd");const [cmd,setCmd]=useState("");const [log,setLog]=useState([]);const [trash,setTrash]=useState([]);
+// ── CEO Panel — fancy visual admin dashboard ──
+const CEOPanel=({notify,user,allUsers,onEditUser,onCreateTest,onDeleteUser,onAnnounce,srvs,onGrantTag})=>{
+  const [tab,setTab]=useState("dashboard");const [cmd,setCmd]=useState("");const [log,setLog]=useState([]);const [trash,setTrash]=useState([]);
   const [annTitle,setAnnTitle]=useState("");const [annText,setAnnText]=useState("");const [annBig,setAnnBig]=useState(false);
+  const [selU,setSelU]=useState(null);const [editXP,setEditXP]=useState("");const [editRole,setEditRole]=useState("");const [editBadge,setEditBadge]=useState("");
+  const [editRep,setEditRep]=useState("");const [tagSearch,setTagSearch]=useState("");
   const fid=u=>u==="me"?"me":allUsers.find(a=>a.username===u)?.id;
   const fusr=u=>u==="me"?user:allUsers.find(a=>a.username===u);
+  const everyone=[user,...allUsers].filter(Boolean);
+  const totalMsgs=srvs.reduce((a,s)=>a+s.channels.reduce((b,c)=>b+(c.msgs||[]).length,0),0);
 
+  // CMD run (kept as power-user tool)
   const run=()=>{
     if(!cmd.trim())return;const c=cmd.trim();let r="",ok=true;
-    if(c==="/help")r="/setxp /addxp /addbadge /removebadge /setrole /setname /setgradient /strike /kick /ban /disable /recover /announce /purge";
+    if(c==="/help")r="/setxp /addxp /addbadge /removebadge /setrole /setname /setgradient /strike /kick /ban /disable /recover /announce /purge /granttag";
     else if(c.startsWith("/setxp ")){const[,u,x]=c.split(" ");const uid=fid(u);if(uid&&x){onEditUser(uid,{xp:parseInt(x)||0});r=`✓ ${u} XP → ${x}`}else{r="✗";ok=false}}
     else if(c.startsWith("/addxp ")){const[,u,x]=c.split(" ");const uid=fid(u);const usr=fusr(u);if(uid&&usr&&x){onEditUser(uid,{xp:(usr.xp||0)+(parseInt(x)||0)});r=`✓ ${u} XP += ${x}`}else{r="✗";ok=false}}
     else if(c.startsWith("/addbadge ")){const[,u,...rest]=c.split(" ");const b=rest.join(" ");const uid=fid(u);const usr=fusr(u);if(uid&&usr&&b){onEditUser(uid,{badges:[...(usr.badges||[]),b]});r=`✓ +${b}`}else{r="✗";ok=false}}
@@ -199,6 +211,7 @@ const CEOPanel=({notify,user,allUsers,onEditUser,onCreateTest,onDeleteUser,onAnn
     else if(c.startsWith("/setrole ")){const[,u,rl]=c.split(" ");const uid=fid(u);if(uid&&rl&&R[rl]){onEditUser(uid,{role:rl});r=`✓ ${u} → ${R[rl].n}`}else{r=`✗ ${Object.keys(R).join(",")}`;ok=false}}
     else if(c.startsWith("/setname ")){const[,u,...rest]=c.split(" ");const uid=fid(u);if(uid&&rest.length){onEditUser(uid,{display:rest.join(" ")});r="✓"}else{r="✗";ok=false}}
     else if(c.startsWith("/setgradient ")){const[,u,c1,c2]=c.split(" ");const uid=fid(u);if(uid&&c1&&c2){onEditUser(uid,{gradient:{c1,c2}});r=`✓ ${c1}→${c2}`}else{r="/setgradient <u> #c1 #c2";ok=false}}
+    else if(c.startsWith("/granttag ")){const[,u,tag]=c.split(" ");const uid=fid(u);if(uid&&tag){onEditUser(uid,{badges:[...(fusr(u)?.badges||[]),tag]});r=`✓ ${u} → +${tag}`}else{r="✗";ok=false}}
     else if(c==="/purge"){const k=Object.keys(localStorage).filter(k=>k.startsWith("ic_"));let rm=0;k.forEach(key=>{const v=localStorage.getItem(key);if(v&&v.length<3){localStorage.removeItem(key);rm++}});r=`♻️ Purged ${rm} empty keys`}
     else if(c.startsWith("/strike "))r=`⚡ ${c.split(" ")[1]}: ${c.split(" ").slice(2).join(" ")||"?"}`;
     else if(c.startsWith("/kick "))r=`🔨 ${c.split(" ")[1]} kicked`;
@@ -210,59 +223,217 @@ const CEOPanel=({notify,user,allUsers,onEditUser,onCreateTest,onDeleteUser,onAnn
     setLog(p=>[{c,r,ok,t:new Date().toLocaleTimeString()},...p]);setCmd("");
   };
 
+  // Stat card component
+  const Stat=({icon,label,value,color,sub})=><div className="card" style={{textAlign:"center",padding:14}}>
+    <div style={{fontSize:24,marginBottom:4}}>{icon}</div>
+    <div style={{fontSize:22,fontWeight:800,color:color||"var(--tx)"}}>{value}</div>
+    <div style={{fontSize:10,color:"var(--txm)",marginTop:2}}>{label}</div>
+    {sub&&<div style={{fontSize:8,color:"var(--txg)",marginTop:1}}>{sub}</div>}
+  </div>;
+
   return(
     <div style={{flex:1,display:"flex",overflow:"hidden"}}>
-      <div style={{width:170,background:"var(--bg2)",borderRight:"1px solid var(--bdr)",padding:"14px 6px"}}>
-        <div className="sl">👑 CEO</div>
-        {["cmd","users","announcements","trash","storage"].map(t=><div key={t} className={`ch ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{t==="cmd"?"⌘ CMD":t}</div>)}
+      <div style={{width:180,background:"var(--bg2)",borderRight:"1px solid var(--bdr)",padding:"14px 6px"}}>
+        <div style={{padding:"8px 8px 12px",textAlign:"center"}}>
+          <div style={{fontSize:24,marginBottom:2}}>👑</div>
+          <div style={{fontSize:12,fontWeight:800,background:"linear-gradient(135deg,#FFD700,#F59E0B)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>CEO Panel</div>
+          <div style={{fontSize:8,color:"var(--txg)"}}>v4.6</div>
+        </div>
+        {[["dashboard","📊 Dashboard"],["users","👥 Users"],["reputation","⭐ Reputation"],["tags","🏷 Tags"],["announcements","📢 Announce"],["trash","🗑 Trash"],["storage","💾 Storage"],["cmd","⌘ Terminal"]].map(([k,n])=>
+          <div key={k} className={`ch ${tab===k?"on":""}`} onClick={()=>setTab(k)} style={{fontSize:11}}>{n}</div>
+        )}
       </div>
       <div style={{flex:1,padding:22,overflowY:"auto"}}>
-        {tab==="cmd"&&<div>
-          <h2 style={{fontSize:16,fontWeight:800,marginBottom:10}}>⌘ Console</h2>
-          <div style={{display:"flex",gap:6,marginBottom:10}}>
-            <div style={{flex:1,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:10,background:"#080808",border:"1px solid var(--bdr)"}}>
-              <span style={{color:"var(--ok)",fontWeight:700}}>$</span>
-              <input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&run()} placeholder="/help" style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--ok)",fontSize:12,fontFamily:"monospace"}}/>
-            </div>
-            <button className="btn bp" onClick={run} style={{fontFamily:"monospace",background:"linear-gradient(135deg,var(--ok),#16A34A)"}}>Run</button>
+
+        {/* ═══ DASHBOARD ═══ */}
+        {tab==="dashboard"&&<div>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:4,background:"linear-gradient(135deg,#FFD700,#F59E0B)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Dashboard</h2>
+          <p style={{fontSize:10,color:"var(--txm)",marginBottom:14}}>Platform overview at a glance</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
+            <Stat icon="👥" label="Total Users" value={everyone.length} color="var(--acl)"/>
+            <Stat icon="🖥" label="Servers" value={srvs.length} color="var(--ok)" sub={`${ESRV.count}/${ESRV.max} early`}/>
+            <Stat icon="💬" label="Messages" value={totalMsgs} color="var(--inf)"/>
+            <Stat icon="⭐" label="Total XP" value={everyone.reduce((a,u)=>a+(u.xp||0),0)} color="var(--wrn)"/>
           </div>
-          <div style={{display:"flex",gap:3,flexWrap:"wrap",marginBottom:10}}>{["/help","/setxp","/addxp","/addbadge","/setrole","/setname","/setgradient","/purge"].map(c=><button key={c} onClick={()=>setCmd(c+" ")} style={{padding:"2px 6px",borderRadius:5,background:"var(--bg4)",border:"1px solid var(--bdr)",color:"var(--txm)",fontSize:9,cursor:"pointer",fontFamily:"monospace"}}>{c}</button>)}</div>
-          {log.map((l,i)=><div key={i} style={{padding:6,borderRadius:6,background:"var(--bg4)",border:"1px solid var(--bdr)",marginBottom:3,fontFamily:"monospace"}}><div style={{fontSize:11,color:"var(--ok)"}}>$ {l.c}</div><div style={{fontSize:10,color:l.ok?"var(--txm)":"var(--err)"}}>{l.r}</div></div>)}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <div className="card">
+              <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>🏰 Early Server Status</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{flex:1}}>
+                  <div style={{width:"100%",height:8,borderRadius:4,background:"var(--bdr)",overflow:"hidden"}}><div style={{width:`${Math.min(ESRV.count/ESRV.max*100,100)}%`,height:"100%",borderRadius:4,background:ESRV.count>=ESRV.max?"var(--err)":"linear-gradient(90deg,#14B8A6,#06D6A0)"}}/></div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:9,color:"var(--txm)"}}>{ESRV.count} created</span><span style={{fontSize:9,color:"var(--txm)"}}>{ESRV.max} max</span></div>
+                </div>
+                <div style={{fontSize:9,fontWeight:700,color:ESRV.count>=ESRV.max?"var(--err)":"var(--ok)"}}>{ESRV.count>=ESRV.max?"CAP REACHED":"ACTIVE"}</div>
+              </div>
+              <div style={{fontSize:9,color:"var(--txf)",marginTop:6}}>Early owners get 🏰 Early Server Owner badge. After {ESRV.max.toLocaleString()}, only CEO/Admin can grant.</div>
+            </div>
+            <div className="card">
+              <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>📈 Top Users by XP</div>
+              {[...everyone].sort((a,b)=>(b.xp||0)-(a.xp||0)).slice(0,5).map((u,i)=><div key={u.id||i} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0"}}>
+                <span style={{fontSize:10,fontWeight:800,color:i===0?"#FFD700":i===1?"#C0C0C0":i===2?"#CD7F32":"var(--txm)",width:14}}>{i+1}.</span>
+                <Av name={u.display} size={18}/>
+                <span style={{fontSize:11,fontWeight:600,color:R[u.role]?.c,flex:1}}>{u.display}</span>
+                <span style={{fontSize:10,fontWeight:700,color:"var(--wrn)",fontFamily:"monospace"}}>{u.xp||0}</span>
+              </div>)}
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            <div className="card" style={{cursor:"pointer",textAlign:"center"}} onClick={()=>setTab("users")}><div style={{fontSize:18}}>👥</div><div style={{fontSize:10,fontWeight:600,color:"var(--txm)",marginTop:2}}>Manage Users</div></div>
+            <div className="card" style={{cursor:"pointer",textAlign:"center"}} onClick={()=>setTab("reputation")}><div style={{fontSize:18}}>⭐</div><div style={{fontSize:10,fontWeight:600,color:"var(--txm)",marginTop:2}}>Reputation</div></div>
+            <div className="card" style={{cursor:"pointer",textAlign:"center"}} onClick={()=>setTab("tags")}><div style={{fontSize:18}}>🏷</div><div style={{fontSize:10,fontWeight:600,color:"var(--txm)",marginTop:2}}>Tags & Badges</div></div>
+          </div>
         </div>}
+
+        {/* ═══ USERS — visual cards ═══ */}
         {tab==="users"&&<div>
-          <h2 style={{fontSize:16,fontWeight:800,marginBottom:10}}>Users</h2>
-          <button className="btn bp" onClick={onCreateTest} style={{marginBottom:12}}>+ Test Account</button>
-          {[user,...allUsers].filter(Boolean).map(u=><div key={u.id} className="card" style={{marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
-            <Av name={u.display} src={u.avatar} size={28} status={u.status}/>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:12,fontWeight:700,color:R[u.role]?.c}}>{u.display}</span>{u.isTest&&<MsgTag type="system"/>}{u.isMe&&<span className="chip" style={{background:"var(--gld)18",color:"var(--gld)"}}>YOU</span>}</div>
-              <div style={{fontSize:10,color:"var(--txm)"}}>@{u.username} · XP:{u.xp||0} · {R[u.role]?.n}</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div><h2 style={{fontSize:18,fontWeight:800}}>User Management</h2><p style={{fontSize:10,color:"var(--txm)"}}>Click any user to edit</p></div>
+            <button className="btn bp" onClick={onCreateTest} style={{fontSize:11}}>+ Test Account</button>
+          </div>
+          {everyone.map(u=>{const rep=REP.calc(u);const rl=REP.level(rep);const sel=selU===u.id;return<div key={u.id} className="card" style={{marginBottom:6,borderColor:sel?"var(--acc)":"var(--bdr)",transition:".15s"}}>
+            <div onClick={()=>setSelU(sel?null:u.id)} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
+              <Av name={u.display} src={u.avatar} size={36} status={u.status}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                  <span style={{fontSize:13,fontWeight:700,...(u.gradient?{background:`linear-gradient(90deg,${u.gradient.c1},${u.gradient.c2})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}:{color:R[u.role]?.c})}}>{u.display}</span>
+                  <span style={{fontSize:9,color:R[u.role]?.c}}>{R[u.role]?.i}</span>
+                  {u.isTest&&<MsgTag type="system"/>}{u.isMe&&<span className="chip" style={{background:"#FFD70018",color:"var(--gld)"}}>YOU</span>}
+                </div>
+                <div style={{fontSize:10,color:"var(--txm)"}}>@{u.username} · XP:{u.xp||0} · {rl.i} {rl.n} ({rep})</div>
+              </div>
+              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                <div style={{width:60}}>
+                  <div style={{width:"100%",height:3,borderRadius:2,background:"var(--bdr)",overflow:"hidden"}}><div style={{width:`${Math.min(rep/500*100,100)}%`,height:"100%",background:rl.c}}/></div>
+                </div>
+                <span style={{fontSize:14,transform:sel?"rotate(180deg)":"",transition:".2s",color:"var(--txg)"}}>▾</span>
+              </div>
             </div>
-            <div style={{display:"flex",gap:2}}>
-              <button className="btn bs" onClick={()=>{const x=prompt("XP:",u.xp||0);if(x!==null){onEditUser(u.id,{xp:parseInt(x)||0});notify("Set")}}} style={{padding:"2px 5px",fontSize:8}}>XP</button>
-              <button className="btn bs" onClick={()=>{const rl=prompt(Object.keys(R).join(","),u.role);if(rl&&R[rl]){onEditUser(u.id,{role:rl});notify("Set")}}} style={{padding:"2px 5px",fontSize:8}}>Role</button>
-              <button className="btn bs" onClick={()=>{const b=prompt(Object.keys(B).join(","));if(b){onEditUser(u.id,{badges:[...(u.badges||[]),b]});notify("Added")}}} style={{padding:"2px 5px",fontSize:8}}>+B</button>
-              {u.isTest&&<button className="btn" onClick={()=>{onDeleteUser(u.id);notify("Deleted")}} style={{padding:"2px 5px",fontSize:8,color:"var(--err)",background:"rgba(239,68,68,.06)",border:"1px solid rgba(239,68,68,.15)"}}>✕</button>}
-            </div>
-          </div>)}
+            {sel&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--bdr)"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+                <div><div className="sl">Set XP</div><div style={{display:"flex",gap:3}}><input className="li" value={editXP} onChange={e=>setEditXP(e.target.value)} placeholder={""+(u.xp||0)} style={{flex:1,fontSize:11}}/><button className="btn bp" onClick={()=>{if(editXP){onEditUser(u.isMe?"me":u.id,{xp:parseInt(editXP)||0});setEditXP("");notify("XP set")}}} style={{padding:"4px 8px",fontSize:9}}>Set</button></div></div>
+                <div><div className="sl">Role</div><select className="li" value={u.role} onChange={e=>{onEditUser(u.isMe?"me":u.id,{role:e.target.value});notify(`→ ${R[e.target.value]?.n}`)}} style={{fontSize:11}}>{Object.entries(R).map(([k,r])=><option key={k} value={k}>{r.i} {r.n}</option>)}</select></div>
+                <div><div className="sl">Add Badge</div><div style={{display:"flex",gap:3}}><select className="li" value={editBadge} onChange={e=>setEditBadge(e.target.value)} style={{flex:1,fontSize:11}}><option value="">pick...</option>{Object.entries(B).map(([k,b])=><option key={k} value={k}>{b.i} {b.l}</option>)}</select><button className="btn bp" onClick={()=>{if(editBadge){onEditUser(u.isMe?"me":u.id,{badges:[...(u.badges||[]),editBadge]});setEditBadge("");notify("Badge added")}}} style={{padding:"4px 8px",fontSize:9}}>+</button></div></div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+                <span style={{fontSize:9,color:"var(--txg)"}}>Badges:</span>
+                {(u.badges||[]).map((bid,i)=>{const b=B[bid];return<span key={i} className="chip" style={{background:`${b?.c||"var(--txg)"}18`,color:b?.c||"var(--txg)"}}>{b?.i||"?"} {b?.l||bid}<span onClick={()=>{onEditUser(u.isMe?"me":u.id,{badges:(u.badges||[]).filter((_,j)=>j!==i)});notify("Removed")}} style={{cursor:"pointer",marginLeft:2,opacity:.5}}>×</span></span>})}
+              </div>
+              <div style={{display:"flex",gap:4,marginTop:8}}>
+                <button className="btn bp" onClick={()=>{onEditUser(u.isMe?"me":u.id,{xp:(u.xp||0)+50});notify("+50 XP")}} style={{fontSize:9,padding:"3px 8px"}}>+50 XP</button>
+                <button className="btn bs" onClick={()=>{onEditUser(u.isMe?"me":u.id,{strikes:(u.strikes||0)+1});notify("Strike issued")}} style={{fontSize:9,color:"var(--wrn)"}}>⚡ Strike</button>
+                {u.isTest&&<button className="btn" onClick={()=>{onDeleteUser(u.id);setSelU(null);notify("Deleted")}} style={{fontSize:9,padding:"3px 8px",color:"var(--err)",background:"rgba(239,68,68,.06)",border:"1px solid rgba(239,68,68,.15)",marginLeft:"auto"}}>🗑 Delete</button>}
+              </div>
+            </div>}
+          </div>})}
         </div>}
+
+        {/* ═══ REPUTATION ═══ */}
+        {tab==="reputation"&&<div>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:4}}>⭐ Reputation Engine</h2>
+          <p style={{fontSize:10,color:"var(--txm)",marginBottom:14}}>Scores computed from XP, account age, strikes, messages, badges & premium status</p>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14}}>
+            {REP.levels.map(l=><div key={l.n} className="chip" style={{background:`${l.c}18`,color:l.c,padding:"3px 8px"}}>{l.i} {l.n} <span style={{opacity:.5,marginLeft:2}}>{l.min}+</span></div>)}
+          </div>
+          <div className="card" style={{marginBottom:14,padding:14}}>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Score Formula</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+              {[["XP/10","var(--wrn)","max 100"],["Days active","var(--ok)","max 60"],["Badges ×3","var(--inf)",""],["Premium","var(--acl)","+20"],["Msgs/5","var(--tl)","max 80"],["Strikes ×-15","var(--err)","penalty"]].map(([n,c,sub])=>
+                <div key={n} style={{padding:6,borderRadius:6,background:"var(--bg3)",textAlign:"center"}}><div style={{fontSize:11,fontWeight:600,color:c}}>{n}</div>{sub&&<div style={{fontSize:8,color:"var(--txg)"}}>{sub}</div>}</div>
+              )}
+            </div>
+          </div>
+          <div className="sl">All Users — by Reputation</div>
+          {[...everyone].sort((a,b)=>REP.calc(b)-REP.calc(a)).map(u=>{const rep=REP.calc(u);const rl=REP.level(rep);return<div key={u.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"var(--bg4)",border:"1px solid var(--bdr)",marginBottom:4}}>
+            <Av name={u.display} src={u.avatar} size={30}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <span style={{fontSize:12,fontWeight:700,color:R[u.role]?.c}}>{u.display}</span>
+                <span className="chip" style={{background:`${rl.c}18`,color:rl.c}}>{rl.i} {rl.n}</span>
+              </div>
+              <div style={{width:"100%",height:4,borderRadius:2,background:"var(--bdr)",marginTop:3,overflow:"hidden"}}><div style={{width:`${Math.min(Math.max(rep,0)/500*100,100)}%`,height:"100%",borderRadius:2,background:`linear-gradient(90deg,${rl.c},${rl.c}88)`}}/></div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:16,fontWeight:800,color:rl.c}}>{rep}</div>
+              <div style={{fontSize:8,color:"var(--txg)"}}>XP:{u.xp||0} STR:{u.strikes||0}</div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              <button className="btn bp" onClick={()=>{onEditUser(u.isMe?"me":u.id,{xp:(u.xp||0)+25});notify("+25 rep XP")}} style={{fontSize:8,padding:"2px 6px"}}>+XP</button>
+              <button className="btn" onClick={()=>{onEditUser(u.isMe?"me":u.id,{strikes:Math.max(0,(u.strikes||0)-1)});notify("Strike removed")}} style={{fontSize:8,padding:"2px 6px",background:"rgba(34,197,94,.08)",color:"var(--ok)",border:"1px solid rgba(34,197,94,.2)"}}>-STR</button>
+            </div>
+          </div>})}
+        </div>}
+
+        {/* ═══ TAGS — Early Server, badges management ═══ */}
+        {tab==="tags"&&<div>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:4}}>🏷 Tags & Badges</h2>
+          <p style={{fontSize:10,color:"var(--txm)",marginBottom:14}}>Manage special tags. Early Server Owner is automatic for first {ESRV.max.toLocaleString()} servers.</p>
+          <div className="card" style={{marginBottom:14,borderColor:"rgba(20,184,166,.3)",background:"rgba(20,184,166,.03)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              <span style={{fontSize:24}}>🏰</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#14B8A6"}}>Early Server Owner</div>
+                <div style={{fontSize:10,color:"var(--txm)"}}>Granted to owners of the first {ESRV.max.toLocaleString()} servers created on the platform</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:18,fontWeight:800,color:ESRV.count>=ESRV.max?"var(--err)":"#14B8A6"}}>{ESRV.count}</div>
+                <div style={{fontSize:8,color:"var(--txg)"}}>/ {ESRV.max.toLocaleString()}</div>
+              </div>
+            </div>
+            <div style={{width:"100%",height:6,borderRadius:3,background:"var(--bdr)",overflow:"hidden",marginBottom:6}}><div style={{width:`${Math.min(ESRV.count/ESRV.max*100,100)}%`,height:"100%",borderRadius:3,background:"linear-gradient(90deg,#14B8A6,#06D6A0)"}}/></div>
+            {ESRV.count>=ESRV.max&&<div style={{fontSize:10,fontWeight:700,color:"var(--wrn)",marginTop:4}}>⚠ Cap reached. Only CEO/Admin can grant manually below.</div>}
+          </div>
+          <div className="sl">Grant Tags Manually (CEO/Admin)</div>
+          <div className="card" style={{marginBottom:14}}>
+            <div style={{display:"flex",gap:6,marginBottom:8}}>
+              <input className="li" value={tagSearch} onChange={e=>setTagSearch(e.target.value)} placeholder="Search user..." style={{flex:1,fontSize:11}}/>
+            </div>
+            {everyone.filter(u=>!tagSearch||u.display.toLowerCase().includes(tagSearch.toLowerCase())||u.username.toLowerCase().includes(tagSearch.toLowerCase())).map(u=><div key={u.id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid var(--bdr)"}}>
+              <Av name={u.display} size={22}/>
+              <span style={{fontSize:11,fontWeight:600,color:R[u.role]?.c,flex:1}}>{u.display}</span>
+              <div style={{display:"flex",gap:2}}>
+                {(u.badges||[]).includes("early_owner")?<span className="chip" style={{background:"#14B8A618",color:"#14B8A6"}}>🏰 Active</span>
+                :<button className="btn bp" onClick={()=>{onEditUser(u.isMe?"me":u.id,{badges:[...(u.badges||[]),"early_owner"]});notify(`🏰 Early Owner → ${u.display}`)}} style={{fontSize:8,padding:"2px 6px"}}>🏰 Grant</button>}
+                {(u.badges||[]).includes("early")?<span className="chip" style={{background:"#F59E0B18",color:"#F59E0B"}}>🌅 Active</span>
+                :<button className="btn bs" onClick={()=>{onEditUser(u.isMe?"me":u.id,{badges:[...(u.badges||[]),"early"]});notify(`🌅 Early Supporter → ${u.display}`)}} style={{fontSize:8,padding:"2px 6px"}}>🌅 Grant</button>}
+              </div>
+            </div>)}
+          </div>
+          <div className="sl">All Available Badges</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+            {Object.entries(B).map(([k,b])=><div key={k} className="card" style={{textAlign:"center",padding:8}}>
+              {b.img?<img src={b.img} style={{width:24,height:24,borderRadius:4}}/>:<span style={{fontSize:20,color:b.c}}>{b.i}</span>}
+              <div style={{fontSize:9,fontWeight:600,color:b.c,marginTop:2}}>{b.l}</div>
+              <div style={{fontSize:7,color:"var(--txg)"}}>{b.t}</div>
+            </div>)}
+          </div>
+        </div>}
+
+        {/* ═══ ANNOUNCEMENTS ═══ */}
         {tab==="announcements"&&<div>
-          <h2 style={{fontSize:16,fontWeight:800,marginBottom:10}}>📢 Announce</h2>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:10}}>📢 Announcements</h2>
           <div className="card"><input className="li" value={annTitle} onChange={e=>setAnnTitle(e.target.value)} placeholder="Title" style={{marginBottom:6}}/>
             <textarea className="li" value={annText} onChange={e=>setAnnText(e.target.value)} placeholder="Content..." rows={3} style={{resize:"vertical",marginBottom:6}}/>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:11}}>Splash popup</span><Tg on={annBig} onChange={setAnnBig}/></div>
             <button className="btn bp" onClick={()=>{if(!annText.trim()){notify("Empty");return}onAnnounce(annText.trim(),annBig,annTitle.trim());setAnnTitle("");setAnnText("");notify("Sent!")}}>📢 Send</button>
           </div>
         </div>}
+
+        {/* ═══ TRASH ═══ */}
         {tab==="trash"&&<div>
-          <h2 style={{fontSize:16,fontWeight:800,marginBottom:10}}>🗑 Trash</h2>
-          {!trash.length?<p style={{color:"var(--txg)",fontSize:12}}>Empty</p>:trash.map((a,i)=><div key={i} className="card" style={{marginBottom:4}}>
-            <b>{a.u}</b> <span style={{fontSize:10,color:"var(--txg)"}}>· {a.t}</span>
-            <button className="btn bs" onClick={()=>{setTrash(p=>p.filter((_,j)=>j!==i));notify("Recovered")}} style={{marginTop:4,fontSize:10,color:"var(--ok)"}}>♻️</button>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:10}}>🗑 Trash</h2>
+          <div className="card" style={{background:"rgba(239,68,68,.03)",borderColor:"rgba(239,68,68,.15)",marginBottom:10}}>
+            <p style={{fontSize:11,color:"var(--txm)"}}>⚠ Accounts kept <b style={{color:"var(--tx)"}}>14 days</b>. Only <b style={{color:"var(--gld)"}}>CEO</b> can recover.</p>
+          </div>
+          {!trash.length?<p style={{color:"var(--txg)",fontSize:12}}>Empty — /disable &lt;user&gt; to add</p>:trash.map((a,i)=><div key={i} className="card" style={{marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
+            <Av name={a.u} size={28}/>
+            <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{a.u}</div><div style={{fontSize:9,color:"var(--txg)"}}>Disabled {a.t}</div></div>
+            <button className="btn" onClick={()=>{setTrash(p=>p.filter((_,j)=>j!==i));notify(`♻️ ${a.u} recovered`)}} style={{fontSize:10,color:"var(--ok)",background:"rgba(34,197,94,.06)",border:"1px solid rgba(34,197,94,.15)"}}>♻️ Recover</button>
           </div>)}
         </div>}
+
+        {/* ═══ STORAGE ═══ */}
         {tab==="storage"&&<div>
-          <h2 style={{fontSize:16,fontWeight:800,marginBottom:10}}>💾 Storage</h2>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:10}}>💾 Storage</h2>
           {(()=>{let t=0,c=0;Object.keys(localStorage).filter(k=>k.startsWith("ic_")).forEach(k=>{t+=localStorage.getItem(k).length;c++});const kb=Math.round(t/1024);return<div>
             <div className="card" style={{marginBottom:8}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600}}>Total used</span><span style={{fontSize:12,fontWeight:700,color:"var(--acl)"}}>{kb} KB</span></div>
@@ -274,6 +445,23 @@ const CEOPanel=({notify,user,allUsers,onEditUser,onCreateTest,onDeleteUser,onAnn
             <button className="btn" onClick={()=>{if(confirm("Clear ALL data? You'll be logged out.")){Object.keys(localStorage).filter(k=>k.startsWith("ic_")).forEach(k=>localStorage.removeItem(k));location.reload()}}} style={{width:"100%",background:"rgba(239,68,68,.08)",color:"var(--err)",border:"1px solid rgba(239,68,68,.2)",fontWeight:700}}>🗑 Clear Everything</button>
           </div>})()}
         </div>}
+
+        {/* ═══ CMD TERMINAL ═══ */}
+        {tab==="cmd"&&<div>
+          <h2 style={{fontSize:18,fontWeight:800,marginBottom:4}}>⌘ Terminal</h2>
+          <p style={{fontSize:10,color:"var(--txm)",marginBottom:10}}>Power-user console. Type /help for commands.</p>
+          <div style={{display:"flex",gap:6,marginBottom:10}}>
+            <div style={{flex:1,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",borderRadius:10,background:"#060606",border:"1px solid var(--bdr)"}}>
+              <span style={{color:"var(--ok)",fontWeight:700,fontSize:13}}>$</span>
+              <input value={cmd} onChange={e=>setCmd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&run()} placeholder="/help" style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--ok)",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}/>
+            </div>
+            <button className="btn bp" onClick={run} style={{fontFamily:"monospace",background:"linear-gradient(135deg,var(--ok),#16A34A)"}}>Run</button>
+          </div>
+          <div style={{display:"flex",gap:3,flexWrap:"wrap",marginBottom:10}}>{["/help","/setxp","/addxp","/addbadge","/setrole","/setname","/setgradient","/granttag","/purge","/announce"].map(c=><button key={c} onClick={()=>setCmd(c+" ")} style={{padding:"2px 6px",borderRadius:5,background:"var(--bg4)",border:"1px solid var(--bdr)",color:"var(--txm)",fontSize:9,cursor:"pointer",fontFamily:"monospace"}}>{c}</button>)}</div>
+          {log.map((l,i)=><div key={i} style={{padding:6,borderRadius:6,background:"var(--bg4)",border:"1px solid var(--bdr)",marginBottom:3,fontFamily:"'JetBrains Mono',monospace"}}><div style={{fontSize:11,color:"var(--ok)"}}>$ {l.c}</div><div style={{fontSize:10,color:l.ok?"var(--txm)":"var(--err)"}}>{l.r}</div><div style={{fontSize:8,color:"var(--txg)"}}>{l.t}</div></div>)}
+          {!log.length&&<div style={{textAlign:"center",padding:20,color:"var(--txg)",fontSize:11}}>No history yet. Run a command to begin.</div>}
+        </div>}
+
       </div>
     </div>
   );

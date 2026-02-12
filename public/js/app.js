@@ -1,4 +1,4 @@
-/* ═══ interClouder v4.5 — App ═══ */
+/* ═══ interClouder v4.6 — App ═══ */
 
 const SS={
   s(k,v){try{localStorage.setItem("ic_"+k,JSON.stringify(v))}catch(e){}},
@@ -23,7 +23,7 @@ function App(){
   const [showMem,setShowMem]=useState(true);
   const [showTestCreator,setShowTestCreator]=useState(false);
   const [payTier,setPayTier]=useState(null);
-  const [showSplash,setShowSplash]=useState(()=>!SS.l("splashSeen",false));
+  const [showSplash,setShowSplash]=useState(()=>!SS.l("splash46",false));
   const [splashAnn,setSplashAnn]=useState(null);
 
   // Persist
@@ -39,11 +39,19 @@ function App(){
   const nf=t=>{setNotif(t);setTimeout(()=>setNotif(null),2200)};
 
   // Auth
-  const login=u=>{setUser(u);SS.s("user",u);if(!srvs.length)setTimeout(()=>setShowCreate(true),400)};
+  const login=u=>{u.created=u.created||Date.now();u.msgs=u.msgs||0;u.strikes=u.strikes||0;setUser(u);SS.s("user",u);if(!srvs.length)setTimeout(()=>setShowCreate(true),400)};
   const logout=()=>{SS.c();setUser(null);setSrvs([]);setAS(null);setACh(null);setTestUsers([]);setSettings({...DSET});document.documentElement.style.fontSize="13px"};
 
   // Server CRUD
-  const createSrv=s=>{setSrvs(p=>[...p,s]);setAS(s.id);setACh(s.channels[0]?.id);setView("server")};
+  const createSrv=s=>{
+    const isEarly=ESRV.inc();
+    if(isEarly&&!user.badges?.includes("early_owner")){
+      setUser(p=>({...p,badges:[...(p.badges||[]),"early_owner"]}));
+      nf(`🏰 Early Server Owner badge earned! (#${ESRV.count})`);
+    }
+    s.earlyServer=isEarly;
+    setSrvs(p=>[...p,s]);setAS(s.id);setACh(s.channels[0]?.id);setView("server");
+  };
   const editSrv=(id,ch)=>setSrvs(p=>p.map(s=>s.id===id?{...s,...ch}:s));
   const deleteSrv=id=>{setSrvs(p=>p.filter(s=>s.id!==id));if(aS===id){const rest=srvs.filter(s=>s.id!==id);setAS(rest[0]?.id||null);setACh(rest[0]?.channels?.[0]?.id||null)}nf("Server deleted")};
 
@@ -66,7 +74,7 @@ function App(){
         return{...c,msgs:[...(c.msgs||[]),{id:Date.now(),user:user.display,color:R[user.role]?.c,text,time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),reactions:[],rb:{},gradient:user.gradient||null}]};
       })};
     }));
-    setUser(p=>({...p,xp:(p.xp||0)+1}));
+    setUser(p=>({...p,xp:(p.xp||0)+1,msgs:(p.msgs||0)+1}));
   };
 
   const announce=(text,big,title)=>{
@@ -106,7 +114,7 @@ function App(){
   if(!user)return <LoginScreen onLogin={login}/>;
 
   // Splash
-  if(showSplash&&UPDATES.length)return<Splash update={UPDATES[0]} onClose={()=>{setShowSplash(false);SS.s("splashSeen",true)}}/>;
+  if(showSplash&&UPDATES.length)return<Splash update={UPDATES[0]} onClose={()=>{setShowSplash(false);SS.s("splash46",true)}}/>;
   if(splashAnn)return<Splash update={splashAnn} onClose={()=>setSplashAnn(null)}/>;
 
   const srv=srvs.find(s=>s.id===aS);const ch=srv?.channels?.find(c=>c.id===aCh);const msgs=ch?.msgs||[];
@@ -124,6 +132,7 @@ function App(){
           <div key={s.id} className={`si ${a?"on":""}`} onClick={()=>{setView("server");setAS(s.id);setACh(s.channels[0]?.id)}} title={s.name}>
             {a&&<div className="ind"/>}{s.icon}
             {s.isTemp&&<div style={{position:"absolute",top:-3,right:-3,fontSize:6,background:"var(--wrn)",borderRadius:2,padding:"0 2px",color:"#000",fontWeight:800}}>⏱</div>}
+            {s.earlyServer&&<div style={{position:"absolute",bottom:-3,right:-3,fontSize:7,background:"#14B8A6",borderRadius:2,padding:"0 2px",color:"#fff",fontWeight:800}}>🏰</div>}
           </div>
         )})}
         <div className="si" onClick={()=>setShowCreate(true)} style={{background:"transparent",border:"1px dashed var(--bdr)",fontSize:18,color:"var(--txg)"}}>+</div>
@@ -140,6 +149,7 @@ function App(){
               <span style={{fontWeight:800,fontSize:13}}>{srv.name}</span>
               {srv.isTemp&&<span className="chip" style={{background:"var(--wrn)18",color:"var(--wrn)"}}>⏱</span>}
               {srv.isPublic&&<span className="chip" style={{background:"var(--ok)18",color:"var(--ok)"}}>🌐</span>}
+              {srv.earlyServer&&<span className="chip" style={{background:"#14B8A618",color:"#14B8A6"}}>🏰 Early</span>}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}>
               <TagChip tag={srv.tag} srv={srv}/>
@@ -174,6 +184,7 @@ function App(){
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:11,fontWeight:700,...(user.gradient?{background:`linear-gradient(90deg,${user.gradient.c1},${user.gradient.c2})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}:{color:R[user.role]?.c})}}>{user.display}</div>
             <div style={{fontSize:8,color:"var(--ok)"}}>{R[user.role]?.n}{user.premium?` · ${P[user.premium].n}`:""}</div>
+            {(()=>{const rep=REP.calc(user);const rl=REP.level(rep);return<div style={{fontSize:7,color:rl.c}}>{rl.i} {rl.n} ({rep})</div>})()}
           </div>
           <span onClick={()=>setView("settings")} style={{cursor:"pointer",fontSize:13,color:"var(--txg)"}}>⚙</span>
         </div>
@@ -199,7 +210,7 @@ function App(){
                 <Av name={user.display} src={user.avatar} size={24} status={user.status||"online"} anim={user.animAvatar}/>
                 <div>
                   <div style={{fontSize:11,fontWeight:600,...(user.gradient?{background:`linear-gradient(90deg,${user.gradient.c1},${user.gradient.c2})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}:{color:R[user.role]?.c})}}>{user.display}</div>
-                  <div style={{fontSize:8,color:R[user.role]?.c}}>{R[user.role]?.i} {R[user.role]?.n}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:2}}><span style={{fontSize:8,color:R[user.role]?.c}}>{R[user.role]?.i} {R[user.role]?.n}</span><span style={{fontSize:7,color:REP.level(REP.calc(user)).c}}>{REP.level(REP.calc(user)).i}</span></div>
                 </div>
               </div>
               {srvMem.map(u=>(
@@ -222,7 +233,7 @@ function App(){
           <button className="btn bp" onClick={()=>setShowCreate(true)}>+ Create Server</button>
         </div>}
         {view==="moderation"&&<ModPanel srvs={srvs} aS={aS} notify={nf} onEditSrv={editSrv} onDeleteSrv={deleteSrv}/>}
-        {view==="admin"&&<CEOPanel notify={nf} user={user} allUsers={allU} onEditUser={editUser} onCreateTest={()=>setShowTestCreator(true)} onDeleteUser={delUser} onAnnounce={announce}/>}
+        {view==="admin"&&<CEOPanel notify={nf} user={user} allUsers={allU} onEditUser={editUser} onCreateTest={()=>setShowTestCreator(true)} onDeleteUser={delUser} onAnnounce={announce} srvs={srvs}/>}
         {view==="plugins"&&<PlugPanel notify={nf}/>}
         {view==="settings"&&<SetPanel theme={theme} setTheme={setTheme} user={user} notify={nf} onPay={t=>setPayTier(t)} onLogout={logout} onEditUser={editUser} settings={settings} onSetSettings={setSettings}/>}
       </div>
@@ -237,4 +248,4 @@ function App(){
 
 const root=ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App/>);
-console.log("%c⬡ interClouder v4.5","color:#A855F7;font-weight:bold;font-size:14px");
+console.log("%c⬡ interClouder v4.6","color:#A855F7;font-weight:bold;font-size:14px");
